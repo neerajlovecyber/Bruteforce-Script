@@ -174,6 +174,7 @@ def progress_update(progress_win, progress_data):
 
 
 
+
 def process_target(target, log_win, progress_win, progress_data):
     """Process the target by checking for open ports and testing services."""
     # Acquire the semaphore to limit concurrent host processing
@@ -216,7 +217,6 @@ def process_target(target, log_win, progress_win, progress_data):
         progress_update(progress_win, progress_data)
 
         update_active_threads(-1)  # Decrement active thread count once the target is done
-
 def main(stdscr):
     """Main function to handle the curses interface."""
     # Initialize colors and other curses settings
@@ -268,11 +268,25 @@ def main(stdscr):
 
     # Main loop to wait for Ctrl+D or other key input to exit
     while True:
-        # Listen for Ctrl+D to exit
+    # Check for terminal resize or restore
+        if curses.is_term_resized(curses.LINES, curses.COLS):
+            max_y, max_x = stdscr.getmaxyx()
+
+        # Resize log_win and progress_win based on the new terminal size
+            log_win.resize(max_y - 4, max_x)  # Resize the log window
+            progress_win.resize(4, max_x)  # Fixed 4 lines for progress window
+
+        # Reposition the progress_win at the bottom of the terminal
+            progress_win.mvwin(max_y - 4, 0)
+
+        # Redraw progress and log windows
+            progress_update(progress_win, progress_data)  # Update progress bar
+            stdscr.refresh()  # Force a full screen refresh
+
+    # Listen for Ctrl+D to exit
         key = stdscr.getch()
         if key == 4:  # 4 is the ASCII code for Ctrl+D
             break
-        
 
     # No need to explicitly call curses.endwin() because curses.wrapper does it automatically
 

@@ -1,6 +1,5 @@
-targets.txt
+
 testing*
 loot*
-usernames.txt
-passwords.txt
+
 hydra.restore

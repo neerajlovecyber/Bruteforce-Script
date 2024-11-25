@@ -8,7 +8,7 @@ import time
 
 # Semaphore to limit the number of concurrent hosts being processed
 max_concurrent_hosts = 1  # Set to desired maximum concurrent hosts
-service_parallelism_enabled = True 
+service_parallelism_enabled = False 
 host_semaphore = Semaphore(max_concurrent_hosts)
 
 # List of services to test and their corresponding ports
@@ -266,29 +266,31 @@ def main(stdscr):
                 f.write(f"{cred}\n")
             f.write("="*40 + "\n")
 
-    # Main loop to wait for Ctrl+D or other key input to exit
+    # Continuous redraw loop to handle terminal resize, dragging, and other events
     while True:
-    # Check for terminal resize or restore
+        # Check for terminal resize or restore
         if curses.is_term_resized(curses.LINES, curses.COLS):
             max_y, max_x = stdscr.getmaxyx()
 
-        # Resize log_win and progress_win based on the new terminal size
+            # Resize log_win and progress_win based on the new terminal size
             log_win.resize(max_y - 4, max_x)  # Resize the log window
             progress_win.resize(4, max_x)  # Fixed 4 lines for progress window
 
-        # Reposition the progress_win at the bottom of the terminal
+            # Reposition the progress_win at the bottom of the terminal
             progress_win.mvwin(max_y - 4, 0)
 
-        # Redraw progress and log windows
-            progress_update(progress_win, progress_data)  # Update progress bar
-            stdscr.refresh()  # Force a full screen refresh
+        # Redraw the progress and log windows
+        progress_update(progress_win, progress_data)
+        log_win.refresh()  # Refresh log window
+        progress_win.refresh()  # Refresh progress window
+        stdscr.refresh()  # Ensure the screen is updated
 
-    # Listen for Ctrl+D to exit
+        # Sleep for a short time to avoid 100% CPU usage and allow other operations to happen
+        time.sleep(0.1)
+
+        # Listen for Ctrl+D to exit
         key = stdscr.getch()
         if key == 4:  # 4 is the ASCII code for Ctrl+D
             break
-
-    # No need to explicitly call curses.endwin() because curses.wrapper does it automatically
-
 # Start the curses application
 curses.wrapper(main)

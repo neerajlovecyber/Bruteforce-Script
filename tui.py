@@ -55,7 +55,6 @@ def get_open_ports_nmap(target, log_win):
         result = subprocess.run([
             'nmap', '-p', ','.join(map(str, test_services.values())), '--open', '-T4', target, '-oG', '-'
         ], capture_output=True, text=True)
-
         open_ports = []
         for line in result.stdout.splitlines():
             if 'Ports:' in line:
@@ -102,6 +101,7 @@ def test_service(target, service, port, log_win, log_file, progress_data):
         if credentials:
             save_loot(target, service, credentials, progress_data)
             log_win.addstr(f"Valid credentials found for {service} on {target}:{port}\n", curses.color_pair(2))
+            
             
     except Exception as e:
         log_win.addstr(f"Error during test on {target}:{port}: {e}\n", curses.color_pair(3))

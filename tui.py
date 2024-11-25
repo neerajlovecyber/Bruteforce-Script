@@ -2,6 +2,7 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import curses
 import datetime
+from threading import Semaphore
 
 # List of services to test and their corresponding ports
 test_services = {
@@ -15,6 +16,10 @@ test_services = {
 
 # Keeps track of the found credentials to prevent duplicates
 found_credentials = {}
+
+# Semaphore to limit the number of concurrent hosts being processed
+max_concurrent_hosts = 1  # Set to desired maximum concurrent hosts
+host_semaphore = Semaphore(max_concurrent_hosts)
 
 def save_loot(target, service, credentials, progress_data):
     """Save discovered credentials to loot file, ensuring no duplicates."""
@@ -143,36 +148,39 @@ def progress_update(progress_win, progress_data):
 
 def process_target(target, log_win, progress_win, progress_data):
     """Process the target by checking for open ports and testing services."""
-    log_file = f'testing_output_{target.strip()}.log'
-    open_ports = get_open_ports_nmap(target, log_win)
+    # Acquire the semaphore to limit concurrent host processing
+    with host_semaphore:
+        log_file = f'testing_output_{target.strip()}.log'
+        open_ports = get_open_ports_nmap(target, log_win)
 
-    if open_ports:
-        service_ports = {service: port for service, port in test_services.items() if port in open_ports}
+        if open_ports:
+            service_ports = {service: port for service, port in test_services.items() if port in open_ports}
 
-        if 22 in open_ports and 'sftp' in service_ports:
-            del service_ports['sftp']  # Avoid duplicate testing of port 22
+            if 22 in open_ports and 'sftp' in service_ports:
+                del service_ports['sftp']  # Avoid duplicate testing of port 22
 
-        progress_data['total_services'] += len(service_ports)
+            progress_data['total_services'] += len(service_ports)
+            progress_update(progress_win, progress_data)
+
+            with ThreadPoolExecutor() as executor:
+                futures = []
+                for service, port in service_ports.items():
+                    futures.append(executor.submit(test_service, target, service, port, log_win, log_file, progress_data))
+
+                for future in as_completed(futures):
+                    future.result()
+                    progress_data['services_completed'] += 1
+                    progress_update(progress_win, progress_data)
+        else:
+            log_win.addstr(f"No open ports found on {target}.\n", curses.color_pair(2))
+            log_win.refresh()
+
+        progress_data['hosts_completed'] += 1
         progress_update(progress_win, progress_data)
 
-        with ThreadPoolExecutor() as executor:
-            futures = []
-            for service, port in service_ports.items():
-                futures.append(executor.submit(test_service, target, service, port, log_win, log_file, progress_data))
-
-            for future in as_completed(futures):
-                future.result()
-                progress_data['services_completed'] += 1
-                progress_update(progress_win, progress_data)
-    else:
-        log_win.addstr(f"No open ports found on {target}.\n", curses.color_pair(2))
-        log_win.refresh()
-
-    progress_data['hosts_completed'] += 1
-    progress_update(progress_win, progress_data)
-
 def main(stdscr):
-    # Initialize colors
+    """Main function to handle the curses interface."""
+    # Initialize colors and other curses settings
     curses.start_color()
     curses.init_pair(1, curses.COLOR_YELLOW, curses.COLOR_BLACK)
     curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
@@ -181,7 +189,7 @@ def main(stdscr):
     stdscr.clear()
     stdscr.refresh()
 
-    # Create windows
+    # Create windows for logging and progress
     log_win = curses.newwin(curses.LINES - 4, curses.COLS, 0, 0)
     progress_win = curses.newwin(4, curses.COLS, curses.LINES - 4, 0)
 
@@ -203,7 +211,7 @@ def main(stdscr):
 
     progress_update(progress_win, progress_data)
 
-    # Process targets
+    # Process targets with thread pool and semaphore control
     with ThreadPoolExecutor() as executor:
         futures = [executor.submit(process_target, target, log_win, progress_win, progress_data) for target in targets]
         for future in as_completed(futures):
@@ -220,18 +228,13 @@ def main(stdscr):
             f.write("="*40 + "\n")
 
     # Main loop to wait for Ctrl+D or other key input to exit
-
-
     while True:
         # Listen for Ctrl+D to exit
         key = stdscr.getch()
         if key == 4:  # 4 is the ASCII code for Ctrl+D
             break
 
-    # Do not call curses.endwin() explicitly
-    # The cleanup will happen automatically when the program ends, because curses.wrapper takes care of that.
-
-
+    # No need to explicitly call curses.endwin() because curses.wrapper does it automatically
 
 # Start the curses application
 curses.wrapper(main)

@@ -219,9 +219,19 @@ def main(stdscr):
                 f.write(f"{cred}\n")
             f.write("="*40 + "\n")
 
-    stdscr.addstr(0, 0, "Testing completed. Press any key to exit.", curses.color_pair(2))
-    stdscr.refresh()
-    stdscr.getch()
+    # Main loop to wait for Ctrl+D or other key input to exit
+
+
+    while True:
+        # Listen for Ctrl+D to exit
+        key = stdscr.getch()
+        if key == 4:  # 4 is the ASCII code for Ctrl+D
+            break
+
+    # Do not call curses.endwin() explicitly
+    # The cleanup will happen automatically when the program ends, because curses.wrapper takes care of that.
+
+
 
 # Start the curses application
 curses.wrapper(main)

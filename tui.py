@@ -52,8 +52,8 @@ def get_open_ports_nmap(target, log_win):
         log_win.addstr(f"Scanning {target} for open ports...\n", curses.color_pair(1))
         log_win.refresh()
 
-        result = subprocess.run([ 
-            'nmap', '-p', ','.join(map(str, test_services.values())), '--open', '-T4', target, '-oG', '-' 
+        result = subprocess.run([
+            'nmap', '-p', ','.join(map(str, test_services.values())), '--open', '-T4', target, '-oG', '-'
         ], capture_output=True, text=True)
 
         open_ports = []
@@ -71,30 +71,16 @@ def get_open_ports_nmap(target, log_win):
 
         log_win.addstr(f"Open ports on {target}: {open_ports}\n", curses.color_pair(2))
         log_win.refresh()
-
-        # Scroll if the window is full
-        if log_win.getyx()[0] >= curses.LINES - 5:
-            log_win.scroll()
-
         return open_ports
     except Exception as e:
         log_win.addstr(f"Error scanning {target}: {e}\n", curses.color_pair(3))
         log_win.refresh()
-
-        # Scroll if the window is full
-        if log_win.getyx()[0] >= curses.LINES - 5:
-            log_win.scroll()
-
         return []
 
 def test_service(target, service, port, log_win, log_file, progress_data):
     """Attempt to test service authentication with credential list"""
     log_win.addstr(f"Testing {service} on {target}:{port}...\n", curses.color_pair(1))
     log_win.refresh()
-
-    # Scroll if the window is full
-    if log_win.getyx()[0] >= curses.LINES - 5:
-        log_win.scroll()
 
     command = []
     if service == 'ssh':
@@ -122,10 +108,6 @@ def test_service(target, service, port, log_win, log_file, progress_data):
         
     log_win.addstr(f"Testing completed for {service} on {target}:{port}\n", curses.color_pair(2))
     log_win.refresh()
-
-    # Scroll if the window is full
-    if log_win.getyx()[0] >= curses.LINES - 5:
-        log_win.scroll()
 
 def progress_update(progress_win, progress_data):
     """Update the progress bar and display current stats."""
@@ -173,10 +155,6 @@ def process_target(target, log_win, progress_win, progress_data):
         log_win.addstr(f"No open ports found on {target}.\n", curses.color_pair(2))
         log_win.refresh()
 
-        # Scroll if the window is full
-        if log_win.getyx()[0] >= curses.LINES - 5:
-            log_win.scroll()
-
     progress_data['hosts_completed'] += 1
     progress_update(progress_win, progress_data)
 
@@ -192,9 +170,6 @@ def main(stdscr):
 
     # Create windows
     log_win = curses.newwin(curses.LINES - 4, curses.COLS, 0, 0)
-    log_win.scrollok(True)  # Enable scrolling
-    log_win.idlok(True)     # Enable line drawing optimization
-
     progress_win = curses.newwin(4, curses.COLS, curses.LINES - 4, 0)
 
     # Initialize loot file
@@ -213,13 +188,28 @@ def main(stdscr):
         'loot_count': 0
     }
 
-    # Process each target
-    for target in targets:
-        process_target(target, log_win, progress_win, progress_data)
+    progress_update(progress_win, progress_data)
 
-    log_win.addstr(f"Test completed. Loot found: {progress_data['loot_count']} entries.\n", curses.color_pair(2))
-    log_win.refresh()
-    log_win.getch()
+    # Process targets
+    with ThreadPoolExecutor() as executor:
+        futures = [executor.submit(process_target, target, log_win, progress_win, progress_data) for target in targets]
+        for future in as_completed(futures):
+            future.result()
 
-if __name__ == "__main__":
-    curses.wrapper(main)
+    # Write all loot at once after processing all targets
+    with open('loot.txt', 'a') as f:
+        for target, creds in found_credentials.items():
+            f.write(f"\n=== Found at {datetime.datetime.now()} ===\n")
+            f.write(f"Target: {target}\n")
+            f.write("Credentials found:\n")
+            for cred in creds:
+                f.write(f"{cred}\n")
+            f.write("="*40 + "\n")
+
+    stdscr.addstr(0, 0, "Testing completed. Press any key to exit.", curses.color_pair(2))
+    stdscr.refresh()
+    stdscr.getch()
+
+# Start the curses application
+curses.wrapper(main)
+s

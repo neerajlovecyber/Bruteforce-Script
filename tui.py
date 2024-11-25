@@ -2,7 +2,7 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import curses
 import datetime
-from threading import Semaphore
+from threading import Semaphore, Lock
 
 # List of services to test and their corresponding ports
 test_services = {
@@ -18,46 +18,19 @@ test_services = {
 found_credentials = {}
 
 # Semaphore to limit the number of concurrent hosts being processed
-max_concurrent_hosts = 1  # Set to desired maximum concurrent hosts
+max_concurrent_hosts = 5  # Set to desired maximum concurrent hosts
 host_semaphore = Semaphore(max_concurrent_hosts)
 
-def save_loot(target, service, credentials, progress_data):
-    """Save discovered credentials to loot file, ensuring no duplicates."""
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    # Initialize the set for the target if it does not exist
-    if target not in found_credentials:
-        found_credentials[target] = set()  # Use a set to prevent duplicates
-    
-    # Add credentials only if they aren't already present
-    for cred in credentials:
-        found_credentials[target].add(cred)  # Add the credential to the set
-
-    # Update the loot count with the unique credentials for the target
-    progress_data['loot_count'] = sum(len(v) for v in found_credentials.values())
-
-
-def parse_hydra_output(log_file):
-    """Parse output file for valid credentials"""
-    credentials = []
-    try:
-        with open(log_file, 'r') as f:
-            for line in f:
-                if "login:" in line and "password:" in line:
-                    # Format the output to match our criteria for storing
-                    cred_line = line.strip()
-                    credentials.append(cred_line)
-    except Exception as e:
-        print(f"Error parsing log file: {e}")
-    return credentials
-
+# Mutex to safely update active thread count across threads
+active_threads_lock = Lock()
+active_threads_count = 0
 def get_open_ports_nmap(target, log_win):
     """Use nmap to detect open ports for the specified services on the target."""
     try:
         log_win.addstr(f"Scanning {target} for open ports...\n", curses.color_pair(1))
         log_win.refresh()
 
-        result = subprocess.run([
+        result = subprocess.run([ 
             'nmap', '-p', ','.join(map(str, test_services.values())), '--open', '-T4', target, '-oG', '-'
         ], capture_output=True, text=True)
         open_ports = []
@@ -82,7 +55,7 @@ def get_open_ports_nmap(target, log_win):
         return []
 
 def test_service(target, service, port, log_win, log_file, progress_data):
-    """Attempt to test service authentication with credential list"""
+    """Attempt to test service authentication with credential list."""
     log_win.addstr(f"Testing {service} on {target}:{port}...\n", curses.color_pair(1))
     log_win.refresh()
 
@@ -107,12 +80,47 @@ def test_service(target, service, port, log_win, log_file, progress_data):
             save_loot(target, service, credentials, progress_data)
             log_win.addstr(f"Valid credentials found for {service} on {target}:{port}\n", curses.color_pair(2))
             
-            
     except Exception as e:
         log_win.addstr(f"Error during test on {target}:{port}: {e}\n", curses.color_pair(3))
         
     log_win.addstr(f"Testing completed for {service} on {target}:{port}\n", curses.color_pair(2))
     log_win.refresh()
+
+def parse_hydra_output(log_file):
+    """Parse output file for valid credentials"""
+    credentials = []
+    try:
+        with open(log_file, 'r') as f:
+            for line in f:
+                if "login:" in line and "password:" in line:
+                    # Format the output to match our criteria for storing
+                    cred_line = line.strip()
+                    credentials.append(cred_line)
+    except Exception as e:
+        print(f"Error parsing log file: {e}")
+    return credentials
+
+
+def save_loot(target, service, credentials, progress_data):
+    """Save discovered credentials to loot file, ensuring no duplicates."""
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Initialize the set for the target if it does not exist
+    if target not in found_credentials:
+        found_credentials[target] = set()  # Use a set to prevent duplicates
+    
+    # Add credentials only if they aren't already present
+    for cred in credentials:
+        found_credentials[target].add(cred)  # Add the credential to the set
+
+    # Update the loot count with the unique credentials for the target
+    progress_data['loot_count'] = sum(len(v) for v in found_credentials.values())
+
+def update_active_threads(increment):
+    """Update the active threads count safely."""
+    global active_threads_count
+    with active_threads_lock:
+        active_threads_count += increment
 
 def progress_update(progress_win, progress_data):
     """Update the progress display and show stats in a box, side by side."""
@@ -138,18 +146,17 @@ def progress_update(progress_win, progress_data):
     progress_win.addstr(1, 1, f"Hosts: {progress_data['hosts_completed']}/{progress_data['total_hosts']}", curses.color_pair(1))
     progress_win.addstr(1, box_width // 3, f"Services: {progress_data['services_completed']}/{progress_data['total_services']}", curses.color_pair(2))
     progress_win.addstr(1, 2 * box_width // 3, f"Loot: {progress_data['loot_count']} entries", curses.color_pair(1))
-
-    progress_win.addstr(2, 1, "Press Ctrl+D to exit after completion.", curses.color_pair(1))
+    progress_win.addstr(2, 1, f"Active Threads: {active_threads_count}/{max_concurrent_hosts}", curses.color_pair(1))
+    progress_win.addstr(3, 1, "Press Ctrl+D to exit after completion.", curses.color_pair(1))
 
     # Refresh the window to display the updates
     progress_win.refresh()
-
-
 
 def process_target(target, log_win, progress_win, progress_data):
     """Process the target by checking for open ports and testing services."""
     # Acquire the semaphore to limit concurrent host processing
     with host_semaphore:
+        update_active_threads(1)  # Increment active thread count
         log_file = f'testing_output_{target.strip()}.log'
         open_ports = get_open_ports_nmap(target, log_win)
 
@@ -177,6 +184,8 @@ def process_target(target, log_win, progress_win, progress_data):
 
         progress_data['hosts_completed'] += 1
         progress_update(progress_win, progress_data)
+
+        update_active_threads(-1)  # Decrement active thread count once the target is done
 
 def main(stdscr):
     """Main function to handle the curses interface."""

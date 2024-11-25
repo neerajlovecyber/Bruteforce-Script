@@ -4,6 +4,17 @@ import curses
 import datetime
 from threading import Semaphore, Lock
 
+
+def toggle_service_parallelism():
+    """Toggle the service parallelism flag."""
+    global service_parallelism_enabled
+    service_parallelism_enabled = not service_parallelism_enabled
+    print(f"Service Parallelism {'Enabled' if service_parallelism_enabled else 'Disabled'}")
+# Semaphore to limit the number of concurrent hosts being processed
+max_concurrent_hosts = 1  # Set to desired maximum concurrent hosts
+service_parallelism_enabled = False 
+host_semaphore = Semaphore(max_concurrent_hosts)
+
 # List of services to test and their corresponding ports
 test_services = {
     'ssh': 22,
@@ -17,9 +28,8 @@ test_services = {
 # Keeps track of the found credentials to prevent duplicates
 found_credentials = {}
 
-# Semaphore to limit the number of concurrent hosts being processed
-max_concurrent_hosts = 5  # Set to desired maximum concurrent hosts
-host_semaphore = Semaphore(max_concurrent_hosts)
+
+
 
 # Mutex to safely update active thread count across threads
 active_threads_lock = Lock()
@@ -169,13 +179,21 @@ def process_target(target, log_win, progress_win, progress_data):
             progress_data['total_services'] += len(service_ports)
             progress_update(progress_win, progress_data)
 
-            with ThreadPoolExecutor() as executor:
-                futures = []
-                for service, port in service_ports.items():
-                    futures.append(executor.submit(test_service, target, service, port, log_win, log_file, progress_data))
+            if service_parallelism_enabled:
+                # Run services in parallel if parallelism is enabled
+                with ThreadPoolExecutor() as executor:
+                    futures = []
+                    for service, port in service_ports.items():
+                        futures.append(executor.submit(test_service, target, service, port, log_win, log_file, progress_data))
 
-                for future in as_completed(futures):
-                    future.result()
+                    for future in as_completed(futures):
+                        future.result()
+                        progress_data['services_completed'] += 1
+                        progress_update(progress_win, progress_data)
+            else:
+                # Run services sequentially if parallelism is disabled
+                for service, port in service_ports.items():
+                    test_service(target, service, port, log_win, log_file, progress_data)
                     progress_data['services_completed'] += 1
                     progress_update(progress_win, progress_data)
         else:
@@ -242,6 +260,8 @@ def main(stdscr):
         key = stdscr.getch()
         if key == 4:  # 4 is the ASCII code for Ctrl+D
             break
+        elif key == ord('p'):  # Press 'p' to toggle parallelism
+            toggle_service_parallelism()
 
     # No need to explicitly call curses.endwin() because curses.wrapper does it automatically
 

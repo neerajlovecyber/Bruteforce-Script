@@ -110,22 +110,35 @@ def test_service(target, service, port, log_win, log_file, progress_data):
     log_win.refresh()
 
 def progress_update(progress_win, progress_data):
-    """Update the progress bar and display current stats."""
+    """Update the progress display and show stats in a box, side by side."""
     progress_win.clear()
     max_y, max_x = progress_win.getmaxyx()
 
-    try:
-        if max_y < 3 or max_x < 30:
-            progress_win.addstr(0, 0, "Terminal too small! Resize to view progress.", curses.color_pair(3))
-        else:
-            progress_win.addstr(0, 0, f"Hosts Completed: {progress_data['hosts_completed']}/{progress_data['total_hosts']}")
-            progress_win.addstr(1, 0, f"Services Completed: {progress_data['services_completed']}/{progress_data['total_services']}")
-            progress_win.addstr(2, 0, f"Loot Found: {progress_data['loot_count']} entries", curses.color_pair(1))
-            progress_win.addstr(3, 0, "Press Ctrl+D to exit after completion.", curses.color_pair(1))
-    except curses.error:
-        pass
+    # Check if the terminal has enough space for the layout
+    if max_y < 3 or max_x < 50:
+        progress_win.addstr(0, 0, "Terminal too small! Resize to view progress.", curses.color_pair(3))
+        progress_win.refresh()
+        return
 
+    # Draw a box around the progress area
+    box_start_x = 0
+    box_start_y = 0
+    box_width = max_x - 1  # Leave space for the box border
+    box_height = 4  # The height of the box
+
+    # Create the box with border
+    progress_win.border(0, 0, 0, 0, 0, 0, 0, 0)
+
+    # Side-by-side progress information
+    progress_win.addstr(1, 1, f"Hosts: {progress_data['hosts_completed']}/{progress_data['total_hosts']}", curses.color_pair(1))
+    progress_win.addstr(1, box_width // 3, f"Services: {progress_data['services_completed']}/{progress_data['total_services']}", curses.color_pair(2))
+    progress_win.addstr(1, 2 * box_width // 3, f"Loot: {progress_data['loot_count']} entries", curses.color_pair(1))
+
+    progress_win.addstr(2, 1, "Press Ctrl+D to exit after completion.", curses.color_pair(1))
+
+    # Refresh the window to display the updates
     progress_win.refresh()
+
 
 
 def process_target(target, log_win, progress_win, progress_data):
@@ -212,4 +225,3 @@ def main(stdscr):
 
 # Start the curses application
 curses.wrapper(main)
-s

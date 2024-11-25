@@ -5,11 +5,7 @@ import datetime
 from threading import Semaphore, Lock
 
 
-def toggle_service_parallelism():
-    """Toggle the service parallelism flag."""
-    global service_parallelism_enabled
-    service_parallelism_enabled = not service_parallelism_enabled
-    print(f"Service Parallelism {'Enabled' if service_parallelism_enabled else 'Disabled'}")
+
 # Semaphore to limit the number of concurrent hosts being processed
 max_concurrent_hosts = 1  # Set to desired maximum concurrent hosts
 service_parallelism_enabled = False 
@@ -260,8 +256,7 @@ def main(stdscr):
         key = stdscr.getch()
         if key == 4:  # 4 is the ASCII code for Ctrl+D
             break
-        elif key == ord('p'):  # Press 'p' to toggle parallelism
-            toggle_service_parallelism()
+        
 
     # No need to explicitly call curses.endwin() because curses.wrapper does it automatically
 

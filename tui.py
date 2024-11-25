@@ -3,12 +3,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import curses
 import datetime
 from threading import Semaphore, Lock
-
+import time
 
 
 # Semaphore to limit the number of concurrent hosts being processed
 max_concurrent_hosts = 1  # Set to desired maximum concurrent hosts
-service_parallelism_enabled = False 
+service_parallelism_enabled = True 
 host_semaphore = Semaphore(max_concurrent_hosts)
 
 # List of services to test and their corresponding ports
@@ -128,6 +128,7 @@ def update_active_threads(increment):
     with active_threads_lock:
         active_threads_count += increment
 
+
 def progress_update(progress_win, progress_data):
     """Update the progress display and show stats in a box, side by side."""
     progress_win.clear()
@@ -153,10 +154,25 @@ def progress_update(progress_win, progress_data):
     progress_win.addstr(1, box_width // 3, f"Services: {progress_data['services_completed']}/{progress_data['total_services']}", curses.color_pair(2))
     progress_win.addstr(1, 2 * box_width // 3, f"Loot: {progress_data['loot_count']} entries", curses.color_pair(1))
     progress_win.addstr(2, 1, f"Active Threads: {active_threads_count}/{max_concurrent_hosts}", curses.color_pair(1))
-    progress_win.addstr(3, 1, "Press Ctrl+D to exit after completion.", curses.color_pair(1))
+
+    # Add a spinning animation while running
+    spinner = ['.', '..', '...', '....']  # Simple spinner (you can change this to any characters)
+    spin_index = (progress_data['hosts_completed'] + progress_data['services_completed']) % len(spinner)
+    spinner_frame = spinner[spin_index]
+
+    # Update footer message with the spinner animation
+    if progress_data['hosts_completed'] == progress_data['total_hosts'] and progress_data['services_completed'] == progress_data['total_services']:
+        # Use green color for completed status
+        status_message = "Completed! Press Ctrl+D to exit"
+        progress_win.addstr(3, 1, status_message, curses.color_pair(2))  # Green color pair
+    else:
+        status_message = f"Running Bruteforce {spinner_frame} Press Ctrl+C to stop"
+        progress_win.addstr(3, 1, status_message, curses.color_pair(1))  # Default color pair
 
     # Refresh the window to display the updates
     progress_win.refresh()
+
+
 
 def process_target(target, log_win, progress_win, progress_data):
     """Process the target by checking for open ports and testing services."""

@@ -22,6 +22,14 @@ To run this tool, you need the following dependencies installed:
 3. **Python 3.x** – The scripting language for running the tool.
 4. **Curses Library** – For terminal-based progress display (available in most Python distributions).
 
+### pending Stuff
+1. **conver loot to json** - for easy parsing and analysis.
+2. **logging namp out put** - for easy analysis and reporting.
+3. **log file that says no creditneial found for a host** - for easy analysis and reporting.
+4. **kill a halted task after a time** - so the script is not stuck on a single host for a long time.
+
+
+
 ### Installation
 
 1. Install `nmap` and `hydra` on your system.

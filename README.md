@@ -14,7 +14,7 @@ This tool is designed to test various network services for weak or default crede
 ### pending Stuff :warning:
 1. **conver loot to json** - for easy parsing and analysis.
 2. **logging namp out put** - for easy analysis and reporting.
-3. **log file that says no creditneial found for a host** - for easy analysis and reporting.
+3. **log file that says no crenential found for a host** - for easy analysis and reporting.
 4. **kill a halted task after a time** - so the script is not stuck on a single host for a long time.
 5. **use proper wordlsits** - for better results and less time spent on brute-forcing.
 

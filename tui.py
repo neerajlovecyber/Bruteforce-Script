@@ -8,47 +8,35 @@ import os
 ### Configuration ###
 max_concurrent_hosts = 20  # Set to desired maximum concurrent hosts
 service_parallelism_enabled = True  # Set to True to enable parallel service testing
+threads=16 # Set to desired number of threads for Hydra
 ##########################################################################################################
 
 ## wordlist for usernames and passwords ##
-ssh_users = r"wordlists\ssh_users.txt"
-ssh_passwords = r"wordlists\ssh_passwords.txt"
-ftp_users = r"wordlists\ftp_users.txt"
-ftp_passwords = r"wordlists\ftp_passwords.txt"
-rdp_users = r"wordlists\rdp_users.txt"
-rdp_passwords = r"wordlists\rdp_passwords.txt"
-mysql_users = r"wordlists\mysql_users.txt"
-mysql_passwords = r"wordlists\mysql_passwords.txt"
-telnet_users = r"wordlists\telnet_users.txt"
-telnet_passwords = r"wordlists\telnet_passwords.txt"
-smtp_users = r"wordlists\smtp_users.txt"
-smtp_passwords = r"wordlists\smtp_passwords.txt"
-sftp_users = r"wordlists\sftp_users.txt"
-sftp_passwords = r"wordlists\sftp_passwords.txt"
-pop3_users = r"wordlists\pop3_users.txt"
-pop3_passwords = r"wordlists\pop3_passwords.txt"
-smb_users = r"wordlists\smb_users.txt"
-smb_passwords = r"wordlists\smb_passwords.txt"
-snmp_communities = r"wordlists\snmp_communities.txt"
-ldap_users = r"wordlists\ldap_users.txt"
-ldap_passwords = r"wordlists\ldap_passwords.txt"
-rexec_users = r"wordlists\rexec_users.txt"
-rexec_passwords = r"wordlists\rexec_passwords.txt"
-rlogin_users = r"wordlists\rlogin_users.txt"
-rlogin_passwords = r"wordlists\rlogin_passwords.txt"
-rsh_users = r"wordlists\rsh_users.txt"
-rsh_passwords = r"wordlists\rsh_passwords.txt"
-imap_users = r"wordlists\imap_users.txt"
-imap_passwords = r"wordlists\imap_passwords.txt"
-mssql_users = r"wordlists\mssql_users.txt"
-mssql_passwords = r"wordlists\mssql_passwords.txt"
-oracle_users = r"wordlists\oracle_users.txt"
-oracle_passwords = r"wordlists\oracle_passwords.txt"
-postgresql_users = r"wordlists\postgresql_users.txt"
-postgresql_passwords = r"wordlists\postgresql_passwords.txt"
-vnc_passwords = r"wordlists\vnc_passwords.txt"
-irc_users = r"wordlists\irc_users.txt"
-irc_passwords = r"wordlists\irc_passwords.txt"
+user_password_files = {
+    'ssh': ('wordlists/ssh_defuser.lst', 'wordlists/ssh_defpass.lst'),
+    'ftp': ('wordlists/ftp_defuser.lst', 'wordlists/ftp_defpass.lst'),
+    'rdp': ('wordlists/ssh_defuser.lst', 'wordlists/ssh_defpass.lst'),
+    'mysql': ('wordlists/sql_defuser.lst', 'wordlists/sql_defpass.lst'),
+    'telnet': ('wordlists/telnet_defuser.lst', 'wordlists/telnet_defpass.lst'),
+    'sftp': ('wordlists/ftp_defuser.lst', 'wordlists/ftp_defpass.lst'),
+    'pop3': ('wordlists/pop_defuser.lst', 'wordlists/pop_defpass.lst'),
+    'smb1': ('wordlists/windows-users.txt', 'wordlists/password.lst'),
+    'smb2': ('wordlists/windows-users.txt', 'wordlists/password.lst'),
+    'snmp': (None, 'wordlists/snmp-strings.txt'),
+    'http-get': ('wordlists/windows-users.txt', 'wordlists/password.lst'),
+    'ldap': ('wordlists/windows-users.txt', 'wordlists/password.lst'),
+    'rexec': ('wordlists/windows-users.txt', 'wordlists/password.lst'),
+    'smtp': ('wordlists/smtp_defuser.lst', 'wordlists/smtp_defpass.lst'),
+    'rlogin': ('wordlists/windows-users.txt', 'wordlists/password.lst'),
+    'rsh': ('wordlists/windows-users.txt', 'wordlists/password.lst'),
+    'imap': ('wordlists/windows-users.txt', 'wordlists/password.lst'),
+    'mssql': ('wordlists/mssql-default-userpass.txt',None),
+    'oracle': ('wordlists/oracle-default-userpass.txt',None),
+    'postgresql': ('wordlists/postgres-default-userpass.txt', None),
+    'vnc': ('wordlists/simple-users.txt', 'wordlists/vnc-default-passwords.txt'),
+    'irc': ('wordlists/simple-users.txt', 'wordlists/password.lst'),
+}
+
 
 ##########################################################################################################
 
@@ -123,41 +111,81 @@ def get_open_ports_nmap(target, log_win):
         return []
 
 
-def test_service(target, service, port, log_win, log_file, progress_data):
+def test_service(target, service, port, log_win, log_file, progress_data, threads):
     """Attempt to test service authentication with credential list."""
     log_win.addstr(f"Testing {service} on {target}:{port}...\n", curses.color_pair(1))
     log_win.refresh()
 
-    command = []
+    # Look up the user and password file from the user_password_files dictionary
     if service == 'ssh':
-        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'ssh://{target}:{port}']
+        user_file, pass_file = user_password_files['ssh']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'ssh://{target}:{port}']
     elif service == 'ftp':
-        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'ftp://{target}:{port}']
+        user_file, pass_file = user_password_files['ftp']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'ftp://{target}:{port}']
     elif service == 'rdp':
-        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'rdp://{target}:{port}']
+        user_file, pass_file = user_password_files['rdp']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'rdp://{target}:{port}']
     elif service == 'mysql':
-        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'mysql://{target}:{port}']
+        user_file, pass_file = user_password_files['mysql']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'mysql://{target}:{port}']
     elif service == 'telnet':
-        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'telnet://{target}:{port}']
+        user_file, pass_file = user_password_files['telnet']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'telnet://{target}:{port}']
     elif service == 'sftp':
-        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'sftp://{target}:{port}']
+        user_file, pass_file = user_password_files['sftp']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'sftp://{target}:{port}']
     elif service == 'pop3':
-        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'pop3://{target}:{port}']
-    elif service == 'smb1':  # SMB on port 139
-        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'smb://{target}:{port}']
-    elif service == 'smb2':  # SMB on port 445
-        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'smb://{target}:{port}']
+        user_file, pass_file = user_password_files['pop3']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'pop3://{target}:{port}']
+    elif service == 'smb1':
+        user_file, pass_file = user_password_files['smb1']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'smb://{target}:{port}']
+    elif service == 'smb2':
+        user_file, pass_file = user_password_files['smb2']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'smb://{target}:{port}']
     elif service == 'snmp':
-        command = ['hydra', '-P', 'passwords.txt', '-o', log_file, f'snmp://{target}:{port}']
+        pass_file = user_password_files['snmp'][1]
+        command = ['hydra', '-t', str(threads), '-P', pass_file, '-o', log_file, f'snmp://{target}:{port}']
     elif service == 'http-get':
-        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'http-get://{target}:{port}']
+        user_file, pass_file = user_password_files['http-get']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'http-get://{target}:{port}']
     elif service == 'ldap':
-        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'ldap://{target}:{port}']
+        user_file, pass_file = user_password_files['ldap']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'ldap://{target}:{port}']
     elif service == 'rexec':
-        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'rexec://{target}:{port}']
+        user_file, pass_file = user_password_files['rexec']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'rexec://{target}:{port}']
     elif service == 'smtp':
-        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'smtp://{target}:{port}']
-
+        user_file, pass_file = user_password_files['smtp']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'smtp://{target}:{port}']
+    elif service == 'rlogin':
+        user_file, pass_file = user_password_files['rlogin']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'rlogin://{target}:{port}']
+    elif service == 'rsh':
+        user_file, pass_file = user_password_files['rsh']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'rsh://{target}:{port}']
+    elif service == 'imap':
+        user_file, pass_file = user_password_files['imap']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'imap://{target}:{port}']
+    elif service == 'mssql':
+        user_file = user_password_files['mssql']
+        command = ['hydra', '-t', str(threads), '-C', user_file, '-o', log_file, f'mssql://{target}:{port}']
+    elif service == 'oracle':
+        user_file, pass_file = user_password_files['oracle']
+        command = ['hydra', '-t', str(threads), '-C', user_file,  '-o', log_file, f'oracle://{target}:{port}']
+    elif service == 'postgresql':
+        user_file, pass_file = user_password_files['postgresql']
+        command = ['hydra', '-t', str(threads), '-C', user_file,  '-o', log_file, f'postgresql://{target}:{port}']
+    elif service == 'vnc':
+        user_file, pass_file = user_password_files['vnc']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'vnc://{target}:{port}']
+    elif service == 'irc':
+        user_file, pass_file = user_password_files['irc']
+        command = ['hydra', '-t', str(threads), '-L', user_file, '-P', pass_file, '-o', log_file, f'irc://{target}:{port}']
+    else:
+        log_win.addstr(f"Unsupported service: {service}\n", curses.color_pair(2))
+        return
 
     try:
         subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # Suppress Hydra output
@@ -173,6 +201,30 @@ def test_service(target, service, port, log_win, log_file, progress_data):
         
     log_win.addstr(f"Testing completed for {service} on {target}:{port}\n", curses.color_pair(2))
     log_win.refresh()
+
+
+def check_dependencies():
+    """Check if nmap, hydra, and the required wordlists are available."""
+    # Check if nmap is installed
+    try:
+        subprocess.run(['nmap', '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except FileNotFoundError:
+        raise RuntimeError("Error: nmap is not installed. Please install nmap and try again.")
+    
+    # Check if hydra is installed
+    try:
+        subprocess.run(['hydra', '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except FileNotFoundError:
+        raise RuntimeError("Error: hydra is not installed. Please install hydra and try again.")
+
+    # Check if wordlists exist
+    for service, (user_file, pass_file) in user_password_files.items():
+        if user_file and not os.path.exists(user_file):
+            raise RuntimeError(f"Error: Wordlist for {service} user file {user_file} is missing.")
+        if pass_file and not os.path.exists(pass_file):
+            raise RuntimeError(f"Error: Wordlist for {service} password file {pass_file} is missing.")
+    
+    print("All dependencies are satisfied.")
 
 def parse_hydra_output(log_file):
     """Parse output file for valid credentials"""
@@ -279,7 +331,7 @@ def process_target(target, log_win, progress_win, progress_data):
                 with ThreadPoolExecutor() as executor:
                     futures = []
                     for service, port in service_ports.items():
-                        futures.append(executor.submit(test_service, target, service, port, log_win, log_file, progress_data))
+                        futures.append(executor.submit(test_service, target, service, port, log_win, log_file, progress_data,threads))
 
                     for future in as_completed(futures):
                         future.result()
@@ -288,7 +340,7 @@ def process_target(target, log_win, progress_win, progress_data):
             else:
                 # Run services sequentially if parallelism is disabled
                 for service, port in service_ports.items():
-                    test_service(target, service, port, log_win, log_file, progress_data)
+                    test_service(target, service, port, log_win, log_file, progress_data,threads)
                     progress_data['services_completed'] += 1
                     progress_update(progress_win, progress_data)
         else:
@@ -309,7 +361,13 @@ def main(stdscr):
 
     stdscr.clear()
     stdscr.refresh()
-
+    try:
+        check_dependencies()
+    except RuntimeError as e:
+        stdscr.addstr(0, 0, str(e), curses.color_pair(3))
+        stdscr.refresh()
+        stdscr.getch()  # Wait for user input before exiting
+        return
     # Create windows for logging and progress
     global log_win, progress_win
     

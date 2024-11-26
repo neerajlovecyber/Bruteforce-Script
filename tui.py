@@ -4,11 +4,54 @@ import curses
 import datetime
 from threading import Semaphore, Lock
 import time
+import os
+### Configuration ###
+max_concurrent_hosts = 20  # Set to desired maximum concurrent hosts
+service_parallelism_enabled = True  # Set to True to enable parallel service testing
+##########################################################################################################
 
+## wordlist for usernames and passwords ##
+ssh_users = r"wordlists\ssh_users.txt"
+ssh_passwords = r"wordlists\ssh_passwords.txt"
+ftp_users = r"wordlists\ftp_users.txt"
+ftp_passwords = r"wordlists\ftp_passwords.txt"
+rdp_users = r"wordlists\rdp_users.txt"
+rdp_passwords = r"wordlists\rdp_passwords.txt"
+mysql_users = r"wordlists\mysql_users.txt"
+mysql_passwords = r"wordlists\mysql_passwords.txt"
+telnet_users = r"wordlists\telnet_users.txt"
+telnet_passwords = r"wordlists\telnet_passwords.txt"
+smtp_users = r"wordlists\smtp_users.txt"
+smtp_passwords = r"wordlists\smtp_passwords.txt"
+sftp_users = r"wordlists\sftp_users.txt"
+sftp_passwords = r"wordlists\sftp_passwords.txt"
+pop3_users = r"wordlists\pop3_users.txt"
+pop3_passwords = r"wordlists\pop3_passwords.txt"
+smb_users = r"wordlists\smb_users.txt"
+smb_passwords = r"wordlists\smb_passwords.txt"
+snmp_communities = r"wordlists\snmp_communities.txt"
+ldap_users = r"wordlists\ldap_users.txt"
+ldap_passwords = r"wordlists\ldap_passwords.txt"
+rexec_users = r"wordlists\rexec_users.txt"
+rexec_passwords = r"wordlists\rexec_passwords.txt"
+rlogin_users = r"wordlists\rlogin_users.txt"
+rlogin_passwords = r"wordlists\rlogin_passwords.txt"
+rsh_users = r"wordlists\rsh_users.txt"
+rsh_passwords = r"wordlists\rsh_passwords.txt"
+imap_users = r"wordlists\imap_users.txt"
+imap_passwords = r"wordlists\imap_passwords.txt"
+mssql_users = r"wordlists\mssql_users.txt"
+mssql_passwords = r"wordlists\mssql_passwords.txt"
+oracle_users = r"wordlists\oracle_users.txt"
+oracle_passwords = r"wordlists\oracle_passwords.txt"
+postgresql_users = r"wordlists\postgresql_users.txt"
+postgresql_passwords = r"wordlists\postgresql_passwords.txt"
+vnc_passwords = r"wordlists\vnc_passwords.txt"
+irc_users = r"wordlists\irc_users.txt"
+irc_passwords = r"wordlists\irc_passwords.txt"
 
-# Semaphore to limit the number of concurrent hosts being processed
-max_concurrent_hosts = 1  # Set to desired maximum concurrent hosts
-service_parallelism_enabled = False 
+##########################################################################################################
+
 host_semaphore = Semaphore(max_concurrent_hosts)
 
 # List of services to test and their corresponding ports
@@ -18,18 +61,37 @@ test_services = {
     'rdp': 3389,
     'mysql': 3306,
     'telnet': 23,
+    'smtp': 25,
     'sftp': 22,
+    'pop3': 110,
+    'smb1': 139,   # SMB on port 139
+    'smb2': 445,   # SMB on port 445
+    'snmp': 162,
+    'ldap': 389,
+    'rexec': 512,
+    'rlogin': 513,
+    'rsh': 514,
+    'imap': 993,
+    'mssql': 1433,
+    'oracle': 1521,
+    'postgresql': 5432,
+    'vnc': 5900,
+    'vncauth': 5901,
+    'irc': 6667,
 }
+
+
 
 # Keeps track of the found credentials to prevent duplicates
 found_credentials = {}
 
-
-
-
 # Mutex to safely update active thread count across threads
 active_threads_lock = Lock()
 active_threads_count = 0
+logs_dir = 'logs'
+if not os.path.exists(logs_dir):
+    os.makedirs(logs_dir)
+
 def get_open_ports_nmap(target, log_win):
     """Use nmap to detect open ports for the specified services on the target."""
     try:
@@ -60,6 +122,7 @@ def get_open_ports_nmap(target, log_win):
         log_win.refresh()
         return []
 
+
 def test_service(target, service, port, log_win, log_file, progress_data):
     """Attempt to test service authentication with credential list."""
     log_win.addstr(f"Testing {service} on {target}:{port}...\n", curses.color_pair(1))
@@ -76,6 +139,25 @@ def test_service(target, service, port, log_win, log_file, progress_data):
         command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'mysql://{target}:{port}']
     elif service == 'telnet':
         command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'telnet://{target}:{port}']
+    elif service == 'sftp':
+        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'sftp://{target}:{port}']
+    elif service == 'pop3':
+        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'pop3://{target}:{port}']
+    elif service == 'smb1':  # SMB on port 139
+        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'smb://{target}:{port}']
+    elif service == 'smb2':  # SMB on port 445
+        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'smb://{target}:{port}']
+    elif service == 'snmp':
+        command = ['hydra', '-P', 'passwords.txt', '-o', log_file, f'snmp://{target}:{port}']
+    elif service == 'http-get':
+        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'http-get://{target}:{port}']
+    elif service == 'ldap':
+        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'ldap://{target}:{port}']
+    elif service == 'rexec':
+        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'rexec://{target}:{port}']
+    elif service == 'smtp':
+        command = ['hydra', '-L', 'usernames.txt', '-P', 'passwords.txt', '-o', log_file, f'smtp://{target}:{port}']
+
 
     try:
         subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # Suppress Hydra output
@@ -164,7 +246,8 @@ def progress_update(progress_win, progress_data):
     if progress_data['hosts_completed'] == progress_data['total_hosts'] and progress_data['services_completed'] == progress_data['total_services']:
         # Use green color for completed status
         status_message = "Completed! Press Ctrl+D to exit"
-        progress_win.addstr(3, 1, status_message, curses.color_pair(2))  # Green color pair
+        progress_win.addstr(3, 1, status_message, curses.color_pair(2))
+        
     else:
         status_message = f"Running Bruteforce {spinner_frame} Press Ctrl+C to stop"
         progress_win.addstr(3, 1, status_message, curses.color_pair(1))  # Default color pair
@@ -174,13 +257,12 @@ def progress_update(progress_win, progress_data):
 
 
 
-
 def process_target(target, log_win, progress_win, progress_data):
     """Process the target by checking for open ports and testing services."""
     # Acquire the semaphore to limit concurrent host processing
     with host_semaphore:
         update_active_threads(1)  # Increment active thread count
-        log_file = f'testing_output_{target.strip()}.log'
+        log_file = f'logs/testing_output_{target.strip()}.log'
         open_ports = get_open_ports_nmap(target, log_win)
 
         if open_ports:
@@ -229,6 +311,8 @@ def main(stdscr):
     stdscr.refresh()
 
     # Create windows for logging and progress
+    global log_win, progress_win
+    
     log_win = curses.newwin(curses.LINES - 4, curses.COLS, 0, 0)
     progress_win = curses.newwin(4, curses.COLS, curses.LINES - 4, 0)
 

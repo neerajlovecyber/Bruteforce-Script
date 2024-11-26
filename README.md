@@ -11,6 +11,8 @@ This tool is designed to test various network services for weak or default crede
 - **Logging**: Logs output and discovered credentials into a `logs/` directory to keep track of successful attempts.
 - **Customizable**: Allows adjusting the number of concurrent threads, services to be tested, and wordlists for credential testing.
 
+![screenshot](ss/image.png)
+
 ## Requirements
 
 To run this tool, you need the following dependencies installed:

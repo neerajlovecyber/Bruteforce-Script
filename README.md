@@ -11,6 +11,13 @@ This tool is designed to test various network services for weak or default crede
 - **Logging**: Logs output and discovered credentials into a `logs/` directory to keep track of successful attempts.
 - **Customizable**: Allows adjusting the number of concurrent threads, services to be tested, and wordlists for credential testing.
 
+### pending Stuff :warning:
+1. **conver loot to json** - for easy parsing and analysis.
+2. **logging namp out put** - for easy analysis and reporting.
+3. **log file that says no creditneial found for a host** - for easy analysis and reporting.
+4. **kill a halted task after a time** - so the script is not stuck on a single host for a long time.
+5. **use proper wordlsits** - for better results and less time spent on brute-forcing.
+
 ![screenshot](ss/image.png)
 
 ## Requirements
@@ -22,12 +29,7 @@ To run this tool, you need the following dependencies installed:
 3. **Python 3.x** – The scripting language for running the tool.
 4. **Curses Library** – For terminal-based progress display (available in most Python distributions).
 
-### pending Stuff
-1. **conver loot to json** - for easy parsing and analysis.
-2. **logging namp out put** - for easy analysis and reporting.
-3. **log file that says no creditneial found for a host** - for easy analysis and reporting.
-4. **kill a halted task after a time** - so the script is not stuck on a single host for a long time.
-5. **use proper wordlsits** - for better results and less time spent on brute-forcing.
+
 
 
 

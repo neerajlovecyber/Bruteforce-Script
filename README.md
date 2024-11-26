@@ -1,6 +1,6 @@
 # Bruteforce-Automation-Script
- 
-This tool is designed to test various network services for weak or default credentials by performing brute-force attacks using `hydra` and `nmap` for open port discovery. It supports multiple services such as SSH, FTP, RDP, MySQL, and others, and provides a progress display along with logging of discovered credentials.
+
+This tool is designed to test various network services for weak or default credentials by performing brute-force attacks using `hydra` and `nmap` for open port discovery. It supports multiple services such as SSH, FTP, RDP, MySQL, and others, providing a progress display along with logging of discovered credentials.
 
 ## Features
 
@@ -12,6 +12,7 @@ This tool is designed to test various network services for weak or default crede
 - **Customizable**: Allows adjusting the number of concurrent threads, services to be tested, and wordlists for credential testing.
 
 ## Requirements
+
 To run this tool, you need the following dependencies installed:
 
 1. **nmap** – For discovering open ports on the target.
@@ -28,27 +29,17 @@ To run this tool, you need the following dependencies installed:
     sudo apt-get install nmap hydra
     ```
 
-    On macOS:
+2. Clone the repository:
     ```bash
-    brew install nmap hydra
+    git clone https://github.com/neerajlovecyber/Bruteforce-Script.git
+    cd Bruteforce-Script
     ```
 
-2. Ensure the Python environment is set up and install any dependencies (if necessary):
-    ```bash
-    pip install -r requirements.txt
-    ```
+3. Create a `targets.txt` file in the current directory, with each IP address on a new line.
 
-3. Download or clone the repository:
+4. Run the tool:
     ```bash
-    git clone https://github.com/yourusername/BruteForceServiceTester.git
-    cd BruteForceServiceTester
-    ```
-
-4. Download or create the necessary wordlists, and place them in a `wordlists/` directory.
-
-5. Run the tool with:
-    ```bash
-    python3 brute_force_service_tester.py
+    python3 auto_brute.py
     ```
 
 ## Configuration
@@ -64,11 +55,28 @@ You can customize the following settings by modifying the variables at the top o
 
 ### Running the Tool
 
-1. **Target Hosts**: Specify the IP addresses of the target hosts in a text file or pass them as input.
+1. **Target Hosts**: Specify the IP addresses of the target hosts in a text file `targets.txt`.
    
 2. **Start Testing**: The script will scan each target for open ports using `nmap` and then attempt brute-forcing on the open services using `hydra`. The progress and log output will be displayed in the terminal window.
 
-3. **View Results**: The discovered credentials are saved in the `logs/` directory, and the real-time progress will be displayed in the terminal.
+3. **View Results**: The discovered credentials are saved in the `logs/` directory, and the real-time progress will be displayed in the terminal. The loot will be available in `loot.txt`.
+
+    Example Output:
+    ```bash
+    === Security Test Results - Started at 2024-11-26 21:24:27.090076 ===
+
+    === Found at 2024-11-26 21:27:29.116072 ===
+    Target: 172.28.71.182
+    Credentials found:
+    [3306][mysql] host: 172.28.71.182   login: admin   password: admin
+    ========================================
+
+    === Found at 2024-11-26 21:27:29.116099 ===
+    Target: 172.28.71.181
+    Credentials found:
+    [22][ssh] host: 172.28.71.181   login: admin   password: admin123
+    ========================================
+    ```
 
 ### Commands
 
@@ -76,7 +84,4 @@ You can customize the following settings by modifying the variables at the top o
 - **Brute Force Testing**: The tool will use the specified username and password wordlists to attempt login via the supported services.
 - **Logging**: All activity and discovered credentials are saved to the `logs/` directory.
 
-### Example
 
-```bash
-python3 brute_force_service_tester.py

@@ -5,6 +5,7 @@ import datetime
 from threading import Semaphore, Lock
 import time
 import os
+import json
 ### Configuration ###
 max_concurrent_hosts = 20  # Set to desired maximum concurrent hosts
 service_parallelism_enabled = True  # Set to True to enable parallel service testing
@@ -72,7 +73,38 @@ test_services = {
 
 # Keeps track of the found credentials to prevent duplicates
 found_credentials = {}
+log_details = {}
 
+def create_detailed_json_log(targets, found_credentials, log_details):
+    """
+    Create a comprehensive JSON log file with detailed scanning and testing results.
+    
+    :param targets: List of target IP addresses
+    :param found_credentials: Dictionary of discovered credentials
+    :param log_details: Dictionary to store detailed logging information
+    """
+    detailed_log = {
+        'scan_timestamp': datetime.datetime.now().isoformat(),
+        'total_targets': len(targets),
+        'targets': {}
+    }
+
+    for target in targets:
+        target_details = log_details.get(target, {})
+        
+        detailed_log['targets'][target] = {
+            'open_ports': target_details.get('open_ports', []),
+            'services_tested': target_details.get('services_tested', []),
+            'credentials_found': list(found_credentials.get(target, [])),
+            'errors': target_details.get('errors', []),
+            'status': target_details.get('status', 'Not processed')
+        }
+
+    # Write the detailed log to a JSON file
+    log_filename = f'detailed_log_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+    with open(log_filename, 'w') as json_file:
+        json.dump(detailed_log, json_file, indent=4)
+    
 # Mutex to safely update active thread count across threads
 active_threads_lock = Lock()
 active_threads_count = 0
@@ -311,46 +343,73 @@ def progress_update(progress_win, progress_data):
 
 def process_target(target, log_win, progress_win, progress_data):
     """Process the target by checking for open ports and testing services."""
+    # Initialize log details for this target
+    log_details[target] = {
+        'open_ports': [],
+        'services_tested': [],
+        'errors': [],
+        'status': 'Pending'
+    }
+
     # Acquire the semaphore to limit concurrent host processing
     with host_semaphore:
         update_active_threads(1)  # Increment active thread count
         log_file = f'logs/testing_output_{target.strip()}.log'
-        open_ports = get_open_ports_nmap(target, log_win)
+        
+        try:
+            open_ports = get_open_ports_nmap(target, log_win)
+            log_details[target]['open_ports'] = open_ports
 
-        if open_ports:
-            service_ports = {service: port for service, port in test_services.items() if port in open_ports}
+            if open_ports:
+                service_ports = {service: port for service, port in test_services.items() if port in open_ports}
 
-            if 22 in open_ports and 'sftp' in service_ports:
-                del service_ports['sftp']  # Avoid duplicate testing of port 22
+                if 22 in open_ports and 'sftp' in service_ports:
+                    del service_ports['sftp']  # Avoid duplicate testing of port 22
 
-            progress_data['total_services'] += len(service_ports)
-            progress_update(progress_win, progress_data)
+                progress_data['total_services'] += len(service_ports)
+                progress_update(progress_win, progress_data)
 
-            if service_parallelism_enabled:
-                # Run services in parallel if parallelism is enabled
-                with ThreadPoolExecutor() as executor:
-                    futures = []
+                if service_parallelism_enabled:
+                    # Run services in parallel if parallelism is enabled
+                    with ThreadPoolExecutor() as executor:
+                        futures = []
+                        for service, port in service_ports.items():
+                            log_details[target]['services_tested'].append(service)
+                            futures.append(executor.submit(test_service, target, service, port, log_win, log_file, progress_data, threads))
+
+                        for future in as_completed(futures):
+                            try:
+                                future.result()
+                                progress_data['services_completed'] += 1
+                            except Exception as e:
+                                log_details[target]['errors'].append(str(e))
+                            progress_update(progress_win, progress_data)
+                else:
+                    # Run services sequentially if parallelism is disabled
                     for service, port in service_ports.items():
-                        futures.append(executor.submit(test_service, target, service, port, log_win, log_file, progress_data,threads))
-
-                    for future in as_completed(futures):
-                        future.result()
+                        log_details[target]['services_tested'].append(service)
+                        test_service(target, service, port, log_win, log_file, progress_data, threads)
                         progress_data['services_completed'] += 1
                         progress_update(progress_win, progress_data)
             else:
-                # Run services sequentially if parallelism is disabled
-                for service, port in service_ports.items():
-                    test_service(target, service, port, log_win, log_file, progress_data,threads)
-                    progress_data['services_completed'] += 1
-                    progress_update(progress_win, progress_data)
-        else:
-            log_win.addstr(f"No open ports found on {target}.\n", curses.color_pair(2))
+                log_win.addstr(f"No open ports found on {target}.\n", curses.color_pair(2))
+                log_details[target]['status'] = 'No open ports'
+                log_details[target]['errors'].append('No open ports found')
+                log_win.refresh()
+
+            # Mark target as processed successfully
+            log_details[target]['status'] = 'Processed'
+
+        except Exception as e:
+            log_details[target]['status'] = 'Error'
+            log_details[target]['errors'].append(str(e))
+            log_win.addstr(f"Error processing {target}: {e}\n", curses.color_pair(3))
             log_win.refresh()
 
         progress_data['hosts_completed'] += 1
         progress_update(progress_win, progress_data)
 
-        update_active_threads(-1)  # Decrement active thread count once the target is done
+        update_active_threads(-1)  # Decrement activ # Decrement active thread count once the target is done
 def main(stdscr):
     """Main function to handle the curses interface."""
     # Initialize colors and other curses settings
@@ -407,7 +466,16 @@ def main(stdscr):
             for cred in creds:
                 f.write(f"{cred}\n")
             f.write("="*40 + "\n")
-
+    with open('loot.txt', 'a') as f:
+        for target, creds in found_credentials.items():
+            f.write(f"\n=== Found at {datetime.datetime.now()} ===\n")
+            f.write(f"Target: {target}\n")
+            f.write("Credentials found:\n")
+            for cred in creds:
+                f.write(f"{cred}\n")
+            f.write("="*40 + "\n")
+    create_detailed_json_log(targets, found_credentials, log_details)
+    
     # Continuous redraw loop to handle terminal resize, dragging, and other events
     while True:
         # Check for terminal resize or restore

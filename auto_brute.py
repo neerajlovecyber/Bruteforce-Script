@@ -226,7 +226,8 @@ def test_service(target, service, port, log_win, log_file, progress_data, thread
         credentials = parse_hydra_output(log_file)
         if credentials:
             save_loot(target, service, credentials, progress_data)
-            log_win.addstr(f"Valid credentials found for {service} on {target}:{port}\n", curses.color_pair(2))
+            log_win.addstr(f"[+] Valid credentials found for {service} on {target}:{port}\n", curses.color_pair(4))
+            
             
     except Exception as e:
         log_win.addstr(f"Error during test on {target}:{port}: {e}\n", curses.color_pair(3))
@@ -392,9 +393,9 @@ def process_target(target, log_win, progress_win, progress_data):
                         progress_data['services_completed'] += 1
                         progress_update(progress_win, progress_data)
             else:
-                log_win.addstr(f"No open ports found on {target}.\n", curses.color_pair(2))
-                log_details[target]['status'] = 'No open ports'
-                log_details[target]['errors'].append('No open ports found')
+                log_win.addstr(f"No open bruteforcable ports found on {target}.\n", curses.color_pair(3))
+                log_details[target]['status'] = 'No open bruteforcable ports '
+                log_details[target]['errors'].append('No open bruteforcable ports found')
                 log_win.refresh()
 
             # Mark target as processed successfully
@@ -415,8 +416,9 @@ def main(stdscr):
     # Initialize colors and other curses settings
     curses.start_color()
     curses.init_pair(1, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-    curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
+    curses.init_pair(2, curses.COLOR_BLUE, curses.COLOR_BLACK)
     curses.init_pair(3, curses.COLOR_RED, curses.COLOR_BLACK)
+    curses.init_pair(4, curses.COLOR_GREEN, curses.COLOR_WHITE)
 
     stdscr.clear()
     stdscr.refresh()

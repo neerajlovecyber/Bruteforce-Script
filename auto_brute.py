@@ -422,6 +422,7 @@ def main(stdscr):
 
     stdscr.clear()
     stdscr.refresh()
+
     try:
         check_dependencies()
     except RuntimeError as e:
@@ -429,11 +430,17 @@ def main(stdscr):
         stdscr.refresh()
         stdscr.getch()  # Wait for user input before exiting
         return
+
     # Create windows for logging and progress
     global log_win, progress_win
     
     log_win = curses.newwin(curses.LINES - 4, curses.COLS, 0, 0)
     progress_win = curses.newwin(4, curses.COLS, curses.LINES - 4, 0)
+
+    # Enable scrolling and set scroll region for log_win
+    log_win.scrollok(True)  # Enable scrolling
+    log_win.idlok(True)     # Enable line-drawing
+    log_win.setscrreg(0, curses.LINES - 5)  # Set scroll region for log window
 
     # Initialize loot file
     with open('loot.txt', 'w') as f:
@@ -468,16 +475,7 @@ def main(stdscr):
             for cred in creds:
                 f.write(f"{cred}\n")
             f.write("="*40 + "\n")
-    with open('loot.txt', 'a') as f:
-        for target, creds in found_credentials.items():
-            f.write(f"\n=== Found at {datetime.datetime.now()} ===\n")
-            f.write(f"Target: {target}\n")
-            f.write("Credentials found:\n")
-            for cred in creds:
-                f.write(f"{cred}\n")
-            f.write("="*40 + "\n")
-    create_detailed_json_log(targets, found_credentials, log_details)
-    
+
     # Continuous redraw loop to handle terminal resize, dragging, and other events
     while True:
         # Check for terminal resize or restore
@@ -504,5 +502,6 @@ def main(stdscr):
         key = stdscr.getch()
         if key == 4:  # 4 is the ASCII code for Ctrl+D
             break
+
 # Start the curses application
 curses.wrapper(main)

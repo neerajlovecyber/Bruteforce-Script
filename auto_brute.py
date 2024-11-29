@@ -6,18 +6,20 @@ from threading import Semaphore, Lock
 import time
 import os
 import json
+import re
 ### Configuration ###
-max_concurrent_hosts = 20  # Set to desired maximum concurrent hosts
+max_concurrent_hosts = 10  # Set to desired maximum concurrent hosts
 service_parallelism_enabled = True  # Set to True to enable parallel service testing
 threads=16 # Set to desired number of threads for Hydra
 ##########################################################################################################
 
 ## wordlist for usernames and passwords ##
 user_password_files = {
-    'ssh': ('wordlists/ssh_defuser.lst', 'wordlists/ssh_defpass.lst'),
-    'ftp': ('wordlists/ftp_defuser.lst', 'wordlists/ftp_defpass.lst'),
+    'ssh': ('wordlists/demousr.lst', 'wordlists/demopass.lst'),
+
+    'ftp':  ('wordlists/demousr.lst', 'wordlists/demopass.lst'),
     'rdp': ('wordlists/ssh_defuser.lst', 'wordlists/ssh_defpass.lst'),
-    'mysql': ('wordlists/sql_defuser.lst', 'wordlists/sql_defpass.lst'),
+    'mysql':  ('wordlists/demousr.lst', 'wordlists/demopass.lst'),
     'telnet': ('wordlists/telnet_defuser.lst', 'wordlists/telnet_defpass.lst'),
     'sftp': ('wordlists/ftp_defuser.lst', 'wordlists/ftp_defpass.lst'),
     'pop3': ('wordlists/pop_defuser.lst', 'wordlists/pop_defpass.lst'),
@@ -74,6 +76,25 @@ test_services = {
 # Keeps track of the found credentials to prevent duplicates
 found_credentials = {}
 log_details = {}
+def parse_credentials(credentials):
+    """
+    Parse the raw credential string into a structured dictionary.
+    
+    :param credentials: Raw credential string like '[22][ssh] host: 172.28.71.181 login: ftpuser password: password'
+    :return: Dictionary with parsed information or None if the pattern doesn't match
+    """
+    # Updated regular expression to handle extra spaces
+    pattern = r"\[(\d+)\]\[(\w+)\]\s*host:\s*(\S+)\s*login:\s*(\S+)\s*password:\s*(\S+)"
+    match = re.match(pattern, credentials)
+    if match:
+        return {
+            'port': match.group(1),
+            'protocol': match.group(2),
+            'host': match.group(3),
+            'login': match.group(4),
+            'password': match.group(5)
+        }
+    return None
 
 def create_detailed_json_log(targets, found_credentials, log_details):
     """
@@ -83,27 +104,47 @@ def create_detailed_json_log(targets, found_credentials, log_details):
     :param found_credentials: Dictionary of discovered credentials
     :param log_details: Dictionary to store detailed logging information
     """
+    # Start building the detailed log
     detailed_log = {
         'scan_timestamp': datetime.datetime.now().isoformat(),
         'total_targets': len(targets),
         'targets': {}
     }
 
+    # Debugging: Print targets and credentials for troubleshooting
+    print(f"Targets: {targets}")
+    print(f"Found Credentials: {found_credentials}")
+
     for target in targets:
         target_details = log_details.get(target, {})
+
+        # Parse credentials for each target
+        parsed_credentials = [
+            parse_credentials(cred) for cred in found_credentials.get(target, [])
+            if parse_credentials(cred) is not None
+        ]
+       
         
+        # Adding parsed credentials to the detailed log
         detailed_log['targets'][target] = {
             'open_ports': target_details.get('open_ports', []),
             'services_tested': target_details.get('services_tested', []),
-            'credentials_found': list(found_credentials.get(target, [])),
+            'credentials_found': parsed_credentials,
             'errors': target_details.get('errors', []),
             'status': target_details.get('status', 'Not processed')
         }
 
+    # Debugging: Print the detailed log before writing it to file
+    print("Detailed Log: ", json.dumps(detailed_log, indent=4))
+
     # Write the detailed log to a JSON file
-    log_filename = f'detailed_log_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
-    with open(log_filename, 'w') as json_file:
-        json.dump(detailed_log, json_file, indent=4)
+    log_filename = 'detailed_log.json'
+    try:
+        with open(log_filename, 'w') as json_file:
+            json.dump(detailed_log, json_file, indent=4)
+        print(f"Log saved to {log_filename}")
+    except Exception as e:
+        print(f"Error writing to log file: {e}")
     
 # Mutex to safely update active thread count across threads
 active_threads_lock = Lock()
@@ -475,6 +516,7 @@ def main(stdscr):
             for cred in creds:
                 f.write(f"{cred}\n")
             f.write("="*40 + "\n")
+    create_detailed_json_log(targets, found_credentials, log_details)
 
     # Continuous redraw loop to handle terminal resize, dragging, and other events
     while True:
